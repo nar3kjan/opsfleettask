@@ -25,7 +25,7 @@ resource "helm_release" "karpenter" {
   repository_username = data.aws_ecrpublic_authorization_token.token.user_name
   repository_password = data.aws_ecrpublic_authorization_token.token.password
   chart               = "karpenter"
-  version             = "1.0.0"
+  version             = "1.1.0"
   wait                = false
 
   values = [
@@ -42,25 +42,22 @@ resource "helm_release" "karpenter" {
 
 resource "kubectl_manifest" "karpenter_node_pool" {
   yaml_body = <<-YAML
-    apiVersion: karpenter.sh/v1beta1
+    apiVersion: karpenter.sh/v1
     kind: NodePool
     metadata:
       name: default
     spec:
       template:
         spec:
+          expireAfter: 720h # 30 * 24h = 720h
           nodeClassRef:
-            apiVersion: karpenter.k8s.aws/v1beta1
+            group: karpenter.k8s.aws
             kind: EC2NodeClass
             name: default
           taints:
           - key: karpenter-node-pool
             value: "true"
             effect: NoSchedule
-          kubelet:
-            systemReserved:
-              cpu: 100m
-              memory: 100Mi
           requirements:
             - key: karpenter.k8s.aws/instance-category
               operator: In
@@ -68,18 +65,18 @@ resource "kubectl_manifest" "karpenter_node_pool" {
             - key: kubernetes.io/arch
               operator: In
               values: ["amd64", "arm64"]
-            - key: "karpenter.k8s.aws/instance-cpu"
+            - key: kubernetes.io/os
+              operator: In
+              values: ["linux"]
+            - key: karpenter.k8s.aws/instance-generation
               operator: Gt
-              values: ["4"]
-            - key: "karpenter.k8s.aws/instance-memory"
-              operator: Gt
-              values: ["8191"] # 8 * 1024 - 1
+              values: ["2"]
             - key: karpenter.sh/capacity-type
               operator: In
               values: ["spot", "on-demand"]
       disruption:
-        consolidationPolicy: WhenUnderutilized
-        expireAfter: 168h # 7 * 24h = 168h
+        consolidationPolicy: WhenEmptyOrUnderutilized
+        consolidateAfter: 1m
   YAML
 
   depends_on = [
@@ -89,12 +86,11 @@ resource "kubectl_manifest" "karpenter_node_pool" {
 
 resource "kubectl_manifest" "karpenter_node_class" {
   yaml_body = <<-YAML
-    apiVersion: karpenter.k8s.aws/v1beta1
+    apiVersion: karpenter.k8s.aws/v1
     kind: EC2NodeClass
     metadata:
       name: default
     spec:
-      amiFamily: AL2
       role: ${module.karpenter.node_iam_role_name}
       subnetSelectorTerms:
         - tags:
@@ -104,6 +100,8 @@ resource "kubectl_manifest" "karpenter_node_class" {
             karpenter.sh/discovery: ${module.eks.cluster_name}
       tags:
         karpenter.sh/discovery: ${module.eks.cluster_name}
+      amiSelectorTerms:
+        - alias: al2023@latest
   YAML
 
   depends_on = [

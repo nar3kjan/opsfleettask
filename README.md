@@ -17,6 +17,7 @@ This Terraform repository is designed to provision an AWS EKS cluster with Karpe
 
 ## Deploying a Pod to Specific Architecture
 To deploy workloads on specific architectures, you can use node selectors in your Kubernetes deployments.
+Use tolerations to schedule pod in Karpenter node pool.
 
 ### Example Deployment for ARM64 (Graviton) Architecture with Spot capacity type
 ```yaml
@@ -37,7 +38,7 @@ spec:
       nodeSelector:
         kubernetes.io/arch: arm64
         karpenter.sh/capacity-type: spot
-      tolerations:  # <-- Tolerations added here
+      tolerations:
         - key: "karpenter-node-pool"
           operator: "Equal"
           value: "true"

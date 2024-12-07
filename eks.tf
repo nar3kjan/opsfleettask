@@ -27,7 +27,7 @@ module "eks" {
       min_size     = 2
       max_size     = 10
       desired_size = 2
-      
+
       taints = {
         # This Taint aims to keep just EKS Addons and Karpenter running on this MNG
         # The pods that do not tolerate this taint should run on nodes created by Karpenter
