@@ -37,6 +37,12 @@ spec:
       nodeSelector:
         kubernetes.io/arch: arm64
         karpenter.sh/capacity-type: spot
+      tolerations:  # <-- Tolerations added here
+        - key: "karpenter-node-pool"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+
       containers:
         - name: nginx
           image: nginx
